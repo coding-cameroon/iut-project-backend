@@ -54,9 +54,3 @@ async function testLogin() {
 }
 
 testLogin();
-
-// register jwt
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXF0YXNnNHcwMDAwZWI2NG85NGptaHJyIiwiZW1haWwiOiJ0ZXN0aW5nZW1haWxAZ21haWwuY29tIiwiaWF0IjoxNzgyMzc5NTkzLCJleHAiOjE3ODI0NjU5OTN9.PQO2X9sZKlO4-KJMC8CAP3_c4xzt_Hrq6UKtA5COO9w
-
-// login jwt
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXF0YXNnNHcwMDAwZWI2NG85NGptaHJyIiwiZW1haWwiOiJ0ZXN0aW5nZW1haWxAZ21haWwuY29tIiwiaWF0IjoxNzgyMzc5ODc4LCJleHAiOjE3ODI0NjYyNzh9.A-hyyW6otaXZ-Xp1r8k5lnP0F4FsizbZJAiBE_FilSo
