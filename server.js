@@ -166,7 +166,7 @@ app.use("/api/alert-types", authMiddleware, alertTypeRoutes);
 app.use("/api/routing", authMiddleware, routingRoutes);
 
 // Route de santé
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "OK",
     timestamp: new Date().toISOString(),
