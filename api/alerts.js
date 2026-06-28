@@ -207,6 +207,51 @@ router.get("/:id", async (req, res) => {
 });
 
 /**
+ * @route GET /api/alerts/user/:id
+ * @desc Récupération d'une alerte d'utilisateur
+ * @access Private
+ */
+router.get("/user/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const alert = await prisma.alert.findMany({
+      where: { userId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        media: true,
+        responses: true,
+        assignments: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (alert.length === 0) {
+      return res.status(404).json({
+        error: "Aucune alerte trouvée pour cet utilisateur",
+        code: "ALERT_NOT_FOUND",
+      });
+    }
+
+    res.json({ alert });
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'alerte:", error);
+    res.status(500).json({
+      error: "Erreur interne du serveur",
+      code: "INTERNAL_ERROR",
+    });
+  }
+});
+
+/**
  * @route POST /api/alerts
  * @desc Création d'une nouvelle alerte avec support de fichiers
  * @access Private
