@@ -1,7 +1,5 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const jwt = require("jsonwebtoken");
+const prisma = require("../lib/prisma");
 
 /**
  * Middleware d'authentification
@@ -11,17 +9,17 @@ const prisma = new PrismaClient();
  */
 const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
     if (!token) {
       return res.status(401).json({
-        error: 'Token d\'authentification requis',
-        code: 'NO_TOKEN'
+        error: "Token d'authentification requis",
+        code: "NO_TOKEN",
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Vérification de l'utilisateur en base de données
     const user = await prisma.user.findUnique({
       where: { id: decoded.id || decoded.userId },
@@ -31,38 +29,38 @@ const authMiddleware = async (req, res, next) => {
         firstName: true,
         lastName: true,
         role: true,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     if (!user || !user.isActive) {
       return res.status(401).json({
-        error: 'Utilisateur non trouvé ou inactif',
-        code: 'USER_NOT_FOUND'
+        error: "Utilisateur non trouvé ou inactif",
+        code: "USER_NOT_FOUND",
       });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
+    if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
-        error: 'Token invalide',
-        code: 'INVALID_TOKEN'
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        error: 'Token expiré',
-        code: 'TOKEN_EXPIRED'
+        error: "Token invalide",
+        code: "INVALID_TOKEN",
       });
     }
 
-    console.error('Erreur d\'authentification:', error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        error: "Token expiré",
+        code: "TOKEN_EXPIRED",
+      });
+    }
+
+    console.error("Erreur d'authentification:", error);
     res.status(500).json({
-      error: 'Erreur interne du serveur',
-      code: 'AUTH_ERROR'
+      error: "Erreur interne du serveur",
+      code: "AUTH_ERROR",
     });
   }
 };
@@ -71,12 +69,15 @@ const authMiddleware = async (req, res, next) => {
  * Middleware pour vérifier si l'utilisateur est admin
  */
 const requireAdmin = (req, res, next) => {
-  if (req.user && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+  if (
+    req.user &&
+    (req.user.role === "ADMIN" || req.user.role === "SUPER_ADMIN")
+  ) {
     next();
   } else {
     res.status(403).json({
-      error: 'Accès refusé. Droits d\'administrateur requis.',
-      code: 'FORBIDDEN'
+      error: "Accès refusé. Droits d'administrateur requis.",
+      code: "FORBIDDEN",
     });
   }
 };
@@ -85,12 +86,12 @@ const requireAdmin = (req, res, next) => {
  * Middleware pour vérifier si l'utilisateur est super admin
  */
 const requireSuperAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'SUPER_ADMIN') {
+  if (req.user && req.user.role === "SUPER_ADMIN") {
     next();
   } else {
     res.status(403).json({
-      error: 'Accès refusé. Droits de super administrateur requis.',
-      code: 'FORBIDDEN'
+      error: "Accès refusé. Droits de super administrateur requis.",
+      code: "FORBIDDEN",
     });
   }
 };
@@ -99,12 +100,17 @@ const requireSuperAdmin = (req, res, next) => {
  * Middleware pour vérifier si l'utilisateur est manager
  */
 const requireManager = (req, res, next) => {
-  if (req.user && (req.user.role === 'MANAGER' || req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+  if (
+    req.user &&
+    (req.user.role === "MANAGER" ||
+      req.user.role === "ADMIN" ||
+      req.user.role === "SUPER_ADMIN")
+  ) {
     next();
   } else {
     res.status(403).json({
-      error: 'Accès refusé. Droits de manager requis.',
-      code: 'FORBIDDEN'
+      error: "Accès refusé. Droits de manager requis.",
+      code: "FORBIDDEN",
     });
   }
 };
@@ -115,13 +121,19 @@ const requireManager = (req, res, next) => {
 const requireOwnershipOrRole = (roles) => (req, res, next) => {
   const userId = req.params.id; // Supposons que l'ID de la ressource utilisateur est dans les params
   const allowedRoles = Array.isArray(roles) ? roles : [roles];
-  
-  if (req.user && (req.user.id === userId || allowedRoles.includes(req.user.role) || req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+
+  if (
+    req.user &&
+    (req.user.id === userId ||
+      allowedRoles.includes(req.user.role) ||
+      req.user.role === "ADMIN" ||
+      req.user.role === "SUPER_ADMIN")
+  ) {
     next();
   } else {
     res.status(403).json({
-      error: 'Accès refusé.',
-      code: 'FORBIDDEN'
+      error: "Accès refusé.",
+      code: "FORBIDDEN",
     });
   }
 };
@@ -137,5 +149,5 @@ module.exports = {
   requireSuperAdmin,
   requireManager,
   requireOwnershipOrRole,
-  requireRoutingPermission
+  requireRoutingPermission,
 };

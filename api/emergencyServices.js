@@ -1,12 +1,11 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { requireSuperAdmin } = require('../middleware/auth');
 const CacheService = require('../services/cacheService');
 const MonitoringService = require('../services/monitoringService');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const cacheService = new CacheService();
 const monitoringService = new MonitoringService();
 

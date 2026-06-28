@@ -1,13 +1,12 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { requireManager, requireOwnershipOrRole } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

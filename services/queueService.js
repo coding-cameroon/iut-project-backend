@@ -1,10 +1,8 @@
 const Queue = require('bull');
 const Redis = require('ioredis');
 const AIService = require('./aiService');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const config = require('../config/config');
-
-const prisma = new PrismaClient();
 
 // Redis disabled - running without queues
 const redis = null;

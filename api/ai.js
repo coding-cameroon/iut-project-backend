@@ -1,11 +1,10 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const AIService = require('../services/aiService');
 const { requireManager } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * @route POST /api/ai/analyze/:alertId

@@ -1,10 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const AIService = require('./aiService');
-const CacheService = require('./cacheService');
-const QueueService = require('./queueService');
-const MonitoringService = require('./monitoringService');
-
-const prisma = new PrismaClient();
+const prisma = require("../lib/prisma");
+const AIService = require("./aiService");
+const CacheService = require("./cacheService");
+const QueueService = require("./queueService");
+const MonitoringService = require("./monitoringService");
 const cacheService = new CacheService();
 const monitoringService = new MonitoringService();
 
@@ -17,7 +15,7 @@ class AsyncProcessingService {
    */
   static async processAlertAsync(alertId, options = {}) {
     const startTime = Date.now();
-    
+
     try {
       console.log(`Début du traitement asynchrone de l'alerte ${alertId}`);
 
@@ -29,7 +27,7 @@ class AsyncProcessingService {
           success: true,
           fromCache: true,
           analysis: cachedAnalysis,
-          processingTime: Date.now() - startTime
+          processingTime: Date.now() - startTime,
         };
       }
 
@@ -44,13 +42,13 @@ class AsyncProcessingService {
               lastName: true,
               email: true,
               phone: true,
-              role: true
-            }
+              role: true,
+            },
           },
           media: true,
           responses: true,
-          assignments: true
-        }
+          assignments: true,
+        },
       });
 
       if (!alert) {
@@ -65,10 +63,10 @@ class AsyncProcessingService {
           type: true,
           priority: true,
           status: true,
-          createdAt: true
+          createdAt: true,
         },
-        orderBy: { createdAt: 'desc' },
-        take: 10
+        orderBy: { createdAt: "desc" },
+        take: 10,
       });
 
       // Récupération des alertes proches géographiquement
@@ -93,7 +91,7 @@ class AsyncProcessingService {
       const alertWithContext = {
         ...alert,
         userAlertHistory,
-        nearbyAlerts
+        nearbyAlerts,
       };
 
       // Analyse avec l'IA
@@ -105,7 +103,7 @@ class AsyncProcessingService {
         data: {
           type: analysis.classification.predictedType,
           priority: analysis.priority.level,
-          isVerified: analysis.classification.confidence > 0.8
+          isVerified: analysis.classification.confidence > 0.8,
         },
         include: {
           user: {
@@ -114,13 +112,13 @@ class AsyncProcessingService {
               firstName: true,
               lastName: true,
               email: true,
-              phone: true
-            }
+              phone: true,
+            },
           },
           media: true,
           responses: true,
-          assignments: true
-        }
+          assignments: true,
+        },
       });
 
       // Mise en cache de l'analyse
@@ -128,44 +126,55 @@ class AsyncProcessingService {
 
       // Enregistrement des métriques
       const processingTime = Date.now() - startTime;
-      await monitoringService.recordPerformance('alert_analysis', processingTime, {
-        alertId,
-        confidence: analysis.classification.confidence,
-        priority: analysis.priority.level
-      });
+      await monitoringService.recordPerformance(
+        "alert_analysis",
+        processingTime,
+        {
+          alertId,
+          confidence: analysis.classification.confidence,
+          priority: analysis.priority.level,
+        },
+      );
 
       // Envoi aux services d'urgence si priorité élevée
-      if (analysis.priority.level === 'HIGH' || analysis.priority.level === 'CRITICAL') {
+      if (
+        analysis.priority.level === "HIGH" ||
+        analysis.priority.level === "CRITICAL"
+      ) {
         await QueueService.addEmergencyNotificationJob(alertId, analysis, {
-          priority: analysis.priority.level
+          priority: analysis.priority.level,
         });
       }
 
-      console.log(`Traitement asynchrone terminé pour l'alerte ${alertId} en ${processingTime}ms`);
+      console.log(
+        `Traitement asynchrone terminé pour l'alerte ${alertId} en ${processingTime}ms`,
+      );
 
       return {
         success: true,
         fromCache: false,
         alert: updatedAlert,
         analysis: analysis,
-        processingTime
+        processingTime,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      console.error(`Erreur lors du traitement asynchrone de l'alerte ${alertId}:`, error);
-      
+
+      console.error(
+        `Erreur lors du traitement asynchrone de l'alerte ${alertId}:`,
+        error,
+      );
+
       // Enregistrement de l'erreur
-      await monitoringService.recordError('async_alert_processing', error, {
+      await monitoringService.recordError("async_alert_processing", error, {
         alertId,
-        processingTime
+        processingTime,
       });
 
       return {
         success: false,
         error: error.message,
-        processingTime
+        processingTime,
       };
     }
   }
@@ -182,47 +191,53 @@ class AsyncProcessingService {
     const concurrency = options.concurrency || 5;
 
     try {
-      console.log(`Début du traitement parallèle de ${alertIds.length} alertes`);
+      console.log(
+        `Début du traitement parallèle de ${alertIds.length} alertes`,
+      );
 
       // Traitement par lots pour éviter la surcharge
       for (let i = 0; i < alertIds.length; i += concurrency) {
         const batch = alertIds.slice(i, i + concurrency);
-        const batchPromises = batch.map(alertId => 
-          this.processAlertAsync(alertId, options)
+        const batchPromises = batch.map((alertId) =>
+          this.processAlertAsync(alertId, options),
         );
 
         const batchResults = await Promise.allSettled(batchPromises);
-        
+
         batchResults.forEach((result, index) => {
-          if (result.status === 'fulfilled') {
+          if (result.status === "fulfilled") {
             results.push({
               alertId: batch[index],
               success: true,
-              ...result.value
+              ...result.value,
             });
           } else {
             results.push({
               alertId: batch[index],
               success: false,
-              error: result.reason.message
+              error: result.reason.message,
             });
           }
         });
 
         // Pause entre les lots pour éviter la surcharge
         if (i + concurrency < alertIds.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
       const processingTime = Date.now() - startTime;
-      
+
       // Enregistrement des métriques
-      await monitoringService.recordPerformance('batch_alert_processing', processingTime, {
-        totalAlerts: alertIds.length,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length
-      });
+      await monitoringService.recordPerformance(
+        "batch_alert_processing",
+        processingTime,
+        {
+          totalAlerts: alertIds.length,
+          successful: results.filter((r) => r.success).length,
+          failed: results.filter((r) => !r.success).length,
+        },
+      );
 
       console.log(`Traitement parallèle terminé en ${processingTime}ms`);
 
@@ -232,26 +247,25 @@ class AsyncProcessingService {
         processingTime,
         summary: {
           total: alertIds.length,
-          successful: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length
-        }
+          successful: results.filter((r) => r.success).length,
+          failed: results.filter((r) => !r.success).length,
+        },
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      console.error('Erreur lors du traitement parallèle:', error);
-      
-      await monitoringService.recordError('batch_alert_processing', error, {
+
+      console.error("Erreur lors du traitement parallèle:", error);
+
+      await monitoringService.recordError("batch_alert_processing", error, {
         alertIds,
-        processingTime
+        processingTime,
       });
 
       return {
         success: false,
         error: error.message,
         processingTime,
-        results
+        results,
       };
     }
   }
@@ -267,35 +281,41 @@ class AsyncProcessingService {
       console.log(`Ajout de l'alerte ${alertId} à la queue de traitement`);
 
       const result = await QueueService.addAnalysisJob(alertId, {
-        priority: options.priority || 'normal',
+        priority: options.priority || "normal",
         delay: options.delay || 0,
         metadata: {
-          source: 'async_processing',
-          ...options.metadata
-        }
+          source: "async_processing",
+          ...options.metadata,
+        },
       });
 
       if (result.success) {
         // Enregistrement de la métrique
-        await monitoringService.recordAlertMetric(alertId, 'queued_for_analysis', {
-          jobId: result.jobId,
-          priority: options.priority
-        });
+        await monitoringService.recordAlertMetric(
+          alertId,
+          "queued_for_analysis",
+          {
+            jobId: result.jobId,
+            priority: options.priority,
+          },
+        );
       }
 
       return result;
-
     } catch (error) {
-      console.error(`Erreur lors de l'ajout de l'alerte ${alertId} à la queue:`, error);
-      
-      await monitoringService.recordError('queue_alert_processing', error, {
+      console.error(
+        `Erreur lors de l'ajout de l'alerte ${alertId} à la queue:`,
+        error,
+      );
+
+      await monitoringService.recordError("queue_alert_processing", error, {
         alertId,
-        options
+        options,
       });
 
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -307,55 +327,61 @@ class AsyncProcessingService {
    */
   static async processPendingAlerts(options = {}) {
     const startTime = Date.now();
-    
+
     try {
-      console.log('Début du traitement des alertes en attente');
+      console.log("Début du traitement des alertes en attente");
 
       // Récupération des alertes en attente
       const pendingAlerts = await prisma.alert.findMany({
         where: {
-          status: 'PENDING',
+          status: "PENDING",
           createdAt: {
-            gte: new Date(Date.now() - (options.maxAge || 24 * 60 * 60 * 1000)) // 24h par défaut
-          }
+            gte: new Date(Date.now() - (options.maxAge || 24 * 60 * 60 * 1000)), // 24h par défaut
+          },
         },
         select: {
           id: true,
           type: true,
           priority: true,
-          createdAt: true
+          createdAt: true,
         },
-        orderBy: { createdAt: 'asc' },
-        take: options.limit || 100
+        orderBy: { createdAt: "asc" },
+        take: options.limit || 100,
       });
 
       if (pendingAlerts.length === 0) {
         return {
           success: true,
-          message: 'Aucune alerte en attente',
-          processed: 0
+          message: "Aucune alerte en attente",
+          processed: 0,
         };
       }
 
       // Traitement des alertes
       const results = await this.processMultipleAlertsAsync(
-        pendingAlerts.map(alert => alert.id),
+        pendingAlerts.map((alert) => alert.id),
         {
           concurrency: options.concurrency || 5,
-          ...options
-        }
+          ...options,
+        },
       );
 
       const processingTime = Date.now() - startTime;
 
       // Enregistrement des métriques
-      await monitoringService.recordPerformance('pending_alerts_processing', processingTime, {
-        totalAlerts: pendingAlerts.length,
-        successful: results.summary.successful,
-        failed: results.summary.failed
-      });
+      await monitoringService.recordPerformance(
+        "pending_alerts_processing",
+        processingTime,
+        {
+          totalAlerts: pendingAlerts.length,
+          successful: results.summary.successful,
+          failed: results.summary.failed,
+        },
+      );
 
-      console.log(`Traitement des alertes en attente terminé en ${processingTime}ms`);
+      console.log(
+        `Traitement des alertes en attente terminé en ${processingTime}ms`,
+      );
 
       return {
         success: true,
@@ -364,24 +390,23 @@ class AsyncProcessingService {
         summary: {
           total: pendingAlerts.length,
           successful: results.summary.successful,
-          failed: results.summary.failed
-        }
+          failed: results.summary.failed,
+        },
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      console.error('Erreur lors du traitement des alertes en attente:', error);
-      
-      await monitoringService.recordError('pending_alerts_processing', error, {
+
+      console.error("Erreur lors du traitement des alertes en attente:", error);
+
+      await monitoringService.recordError("pending_alerts_processing", error, {
         options,
-        processingTime
+        processingTime,
       });
 
       return {
         success: false,
         error: error.message,
-        processingTime
+        processingTime,
       };
     }
   }
@@ -392,72 +417,80 @@ class AsyncProcessingService {
    */
   static async optimizePerformance() {
     const startTime = Date.now();
-    
+
     try {
-      console.log('Début de l\'optimisation des performances');
+      console.log("Début de l'optimisation des performances");
 
       const optimizations = [];
 
       // Nettoyage du cache
       const cacheCleanup = await cacheService.cleanCache();
       optimizations.push({
-        type: 'cache_cleanup',
-        result: `${cacheCleanup} clés supprimées du cache`
+        type: "cache_cleanup",
+        result: `${cacheCleanup} clés supprimées du cache`,
       });
 
       // Nettoyage des queues
-      await QueueService.cleanQueues('all', 24);
+      await QueueService.cleanQueues("all", 24);
       optimizations.push({
-        type: 'queue_cleanup',
-        result: 'Queues nettoyées'
+        type: "queue_cleanup",
+        result: "Queues nettoyées",
       });
 
       // Nettoyage des anciennes métriques
       await monitoringService.cleanOldMetrics(24);
       optimizations.push({
-        type: 'metrics_cleanup',
-        result: 'Métriques anciennes nettoyées'
+        type: "metrics_cleanup",
+        result: "Métriques anciennes nettoyées",
       });
 
       // Optimisation de la base de données
       try {
         await prisma.$executeRaw`VACUUM ANALYZE`;
         optimizations.push({
-          type: 'database_optimization',
-          result: 'Base de données optimisée'
+          type: "database_optimization",
+          result: "Base de données optimisée",
         });
       } catch (dbError) {
-        console.warn('Impossible d\'optimiser la base de données:', dbError.message);
+        console.warn(
+          "Impossible d'optimiser la base de données:",
+          dbError.message,
+        );
       }
 
       const processingTime = Date.now() - startTime;
 
       // Enregistrement des métriques
-      await monitoringService.recordPerformance('system_optimization', processingTime, {
-        optimizations: optimizations.length
-      });
+      await monitoringService.recordPerformance(
+        "system_optimization",
+        processingTime,
+        {
+          optimizations: optimizations.length,
+        },
+      );
 
-      console.log(`Optimisation des performances terminée en ${processingTime}ms`);
+      console.log(
+        `Optimisation des performances terminée en ${processingTime}ms`,
+      );
 
       return {
         success: true,
         optimizations,
-        processingTime
+        processingTime,
       };
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      console.error('Erreur lors de l\'optimisation des performances:', error);
-      
-      await monitoringService.recordError('system_optimization', error, {
-        processingTime
+
+      console.error("Erreur lors de l'optimisation des performances:", error);
+
+      await monitoringService.recordError("system_optimization", error, {
+        processingTime,
       });
 
       return {
         success: false,
         error: error.message,
-        processingTime
+        processingTime,
       };
     }
   }
@@ -468,30 +501,26 @@ class AsyncProcessingService {
    */
   static async getProcessingStatus() {
     try {
-      const [
-        queueStatus,
-        cacheStats,
-        systemMetrics,
-        databaseStats
-      ] = await Promise.all([
-        QueueService.getQueueStatus(),
-        cacheService.getCacheStats(),
-        monitoringService.getSystemMetrics(),
-        monitoringService.getDatabaseStats()
-      ]);
+      const [queueStatus, cacheStats, systemMetrics, databaseStats] =
+        await Promise.all([
+          QueueService.getQueueStatus(),
+          cacheService.getCacheStats(),
+          monitoringService.getSystemMetrics(),
+          monitoringService.getDatabaseStats(),
+        ]);
 
       return {
         queues: queueStatus,
         cache: cacheStats,
         system: systemMetrics,
         database: databaseStats,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Erreur lors de la récupération du statut:', error);
+      console.error("Erreur lors de la récupération du statut:", error);
       return {
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }

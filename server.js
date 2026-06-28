@@ -27,7 +27,7 @@ const routingRoutes = require("./api/routing");
 const { authMiddleware } = require("./middleware/auth");
 
 // Import de la configuration de la base de données
-const { PrismaClient } = require("@prisma/client");
+const prisma = require("./lib/prisma");
 
 // Import des services
 const QueueService = require("./services/queueService");
@@ -73,8 +73,6 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-
-const prisma = new PrismaClient();
 
 // Configuration du port
 const PORT = process.env.PORT || 3000;

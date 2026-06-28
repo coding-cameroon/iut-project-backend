@@ -1,13 +1,12 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { requireRoutingPermission } = require('../middleware/auth');
 const IntelligentRoutingService = require('../services/intelligentRoutingService');
 const AIService = require('../services/aiService');
 const MonitoringService = require('../services/monitoringService');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const monitoringService = new MonitoringService();
 
 /**
