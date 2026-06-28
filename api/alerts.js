@@ -67,111 +67,88 @@ router.get("/", async (req, res) => {
       longitude,
       radius = 10000,
     } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    let alerts = [];
+    let total = 0;
 
-    // Construction des filtres
-    const where = {};
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (priority) {
-      where.priority = priority;
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
-    }
-
-    // Filtrage géographique si coordonnées fournies
+    // Mode 1: Geospatial Search
     if (latitude && longitude) {
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
       const rad = parseInt(radius);
 
-      // Utilisation d'une requête brute pour le calcul de distance
-      const alerts = await prisma.$queryRaw`
-        SELECT *, 
-        ST_Distance(
-          ST_Point(longitude, latitude)::geography,
-          ST_Point(${lng}, ${lat})::geography
-        ) as distance
+      // Using Number() to safely handle BigInt from PostgreSQL
+      const results = await prisma.$queryRaw`
+        SELECT *, ST_Distance(ST_Point(longitude, latitude)::geography, ST_Point(${lng}, ${lat})::geography) as distance
         FROM "alerts"
-        WHERE ST_DWithin(
-          ST_Point(longitude, latitude)::geography,
-          ST_Point(${lng}, ${lat})::geography,
-          ${rad}
-        )
+        WHERE ST_DWithin(ST_Point(longitude, latitude)::geography, ST_Point(${lng}, ${lat})::geography, ${rad})
         ORDER BY distance ASC
-        LIMIT ${parseInt(limit)} OFFSET ${skip}
+        LIMIT ${limitNum} OFFSET ${skip}
       `;
 
-      const total = await prisma.$queryRaw`
-        SELECT COUNT(*) as count
-        FROM "alerts"
-        WHERE ST_DWithin(
-          ST_Point(longitude, latitude)::geography,
-          ST_Point(${lng}, ${lat})::geography,
-          ${rad}
-        )
+      const countRes = await prisma.$queryRaw`
+        SELECT COUNT(*) as count FROM "alerts"
+        WHERE ST_DWithin(ST_Point(longitude, latitude)::geography, ST_Point(${lng}, ${lat})::geography, ${rad})
       `;
 
-      return res.json({
-        alerts,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: parseInt(total[0].count),
-          pages: Math.ceil(parseInt(total[0].count) / parseInt(limit)),
-        },
-      });
+      alerts = results;
+      total = Number(countRes[0].count);
     }
-
-    const [alerts, total] = await Promise.all([
-      prisma.alert.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-            },
+    // Mode 2: Standard Search
+    else {
+      const where = {
+        ...(status && { status }),
+        ...(type && { type }),
+        ...(priority && { priority }),
+        ...((startDate || endDate) && {
+          createdAt: {
+            ...(startDate && { gte: new Date(startDate) }),
+            ...(endDate && { lte: new Date(endDate) }),
           },
-          media: true,
-          responses: true,
-          assignments: true,
-        },
-        skip,
-        take: parseInt(limit),
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.alert.count({ where }),
-    ]);
+        }),
+      };
+
+      [alerts, total] = await Promise.all([
+        prisma.alert.findMany({
+          where,
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+            media: true,
+            responses: true,
+            assignments: true,
+          },
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.alert.count({ where }),
+      ]);
+    }
 
     res.json({
       alerts,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
-    console.error("Erreur lors de la récupération des alertes:", error);
+    console.error("Error fetching alerts:", error);
     res.status(500).json({
-      error: "Erreur interne du serveur",
+      error: error.message || "Internal Server Error",
       code: "INTERNAL_ERROR",
     });
   }
