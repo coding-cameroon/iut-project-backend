@@ -147,7 +147,7 @@ router.get("/", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching alerts:", error);
-    res.status(500).json({
+    res.status(error.status || error.statusCode || 500).json({
       error: error.message || "Internal Server Error",
       code: "INTERNAL_ERROR",
     });

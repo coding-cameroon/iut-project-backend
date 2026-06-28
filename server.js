@@ -98,6 +98,7 @@ app.use(
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3005",
         "http://127.0.0.1:5175",
+        "https://iut-project-frontend.vercel.app",
       ];
 
       if (process.env.CORS_ORIGIN) {
