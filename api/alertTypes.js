@@ -1,1 +1,138 @@
-const express = require('express');\nconst { body, validationResult } = require('express-validator');\nconst prisma = require('../lib/prisma');\nconst { requireAuth, requireSuperAdmin } = require('../middleware/auth');\n\nconst router = express.Router();\n\n/**\n * @route GET /api/alert-types\n * @desc Récupérer tous les types d'alerte\n * @access Private\n */\nrouter.get('/', async (req, res) => {\n  try {\n    const types = await prisma.alertType.findMany({\n      where: { isActive: true },\n      include: { \n        services: {\n            select: {\n                id: true,\n                name: true,\n                type: true\n            }\n        }\n      },\n      orderBy: { name: 'asc' }\n    });\n    res.json(types);\n  } catch (error) {\n    console.error('Erreur récupération types alerte:', error);\n    res.status(500).json({ error: 'Erreur serveur', details: error.message });\n  }\n});\n\n/**\n * @route POST /api/alert-types\n * @desc Créer un nouveau type d'alerte\n * @access Private (SuperAdmin)\n */\nrouter.post('/', requireSuperAdmin, [\n  body('name').trim().notEmpty().withMessage('Le nom est requis'),\n  body('severity').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),\n  body('serviceIds').optional().isArray()\n], async (req, res) => {\n  const errors = validationResult(req);\n  if (!errors.isEmpty()) {\n    return res.status(400).json({ errors: errors.array() });\n  }\n\n  try {\n    const { name, description, icon, severity, serviceIds, isActive = true } = req.body;\n    \n    // Check uniqueness\n    const existing = await prisma.alertType.findUnique({ where: { name } });\n    if (existing) {\n      return res.status(409).json({ error: 'Ce type existe déjà' });\n    }\n\n    const data = {\n      name, description, icon, severity, isActive\n    };\n\n    if (serviceIds && serviceIds.length > 0) {\n      data.services = {\n        connect: serviceIds.map(id => ({ id }))\n      };\n    }\n\n    const type = await prisma.alertType.create({\n      data,\n      include: { services: true }\n    });\n    res.status(201).json(type);\n  } catch (error) {\n    console.error('Erreur création type alerte:', error);\n    res.status(500).json({ error: 'Erreur serveur', details: error.message });\n  }\n});\n\n/**\n * @route PUT /api/alert-types/:id\n * @desc Modifier un type d'alerte\n * @access Private (SuperAdmin)\n */\nrouter.put('/:id', requireSuperAdmin, async (req, res) => {\n  const { id } = req.params;\n  const { name, description, icon, severity, serviceIds, isActive } = req.body;\n  \n  try {\n    const data = {};\n    if (name) data.name = name;\n    if (description !== undefined) data.description = description;\n    if (icon !== undefined) data.icon = icon;\n    if (severity) data.severity = severity;\n    if (isActive !== undefined) data.isActive = isActive;\n    \n    if (serviceIds && Array.isArray(serviceIds)) {\n      data.services = {\n        set: serviceIds.map(sid => ({ id: sid }))\n      };\n    }\n\n    const type = await prisma.alertType.update({\n      where: { id },\n      data,\n      include: { services: true }\n    });\n    res.json(type);\n  } catch (error) {\n    console.error('Erreur modification type alerte:', error);\n    res.status(500).json({ error: 'Erreur serveur', details: error.message });\n  }\n});\n\n/**\n * @route DELETE /api/alert-types/:id\n * @desc Supprimer un type d'alerte\n * @access Private (SuperAdmin)\n */\nrouter.delete('/:id', requireSuperAdmin, async (req, res) => {\n  const { id } = req.params;\n  try {\n    // Check if used in alerts\n    const usageCount = await prisma.alert.count({ where: { alertTypeId: id } });\n    if (usageCount > 0) {\n      return res.status(400).json({ error: 'Impossible de supprimer un type utilisé par des alertes existantes.' });\n    }\n\n    await prisma.alertType.delete({ where: { id } });\n    res.json({ message: 'Type supprimé avec succès' });\n  } catch (error) {\n    console.error('Erreur suppression type alerte:', error);\n    res.status(500).json({ error: 'Erreur serveur', details: error.message });\n  }\n});\n\nmodule.exports = router;\n
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const prisma = require('../lib/prisma');
+const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
+
+const router = express.Router();
+
+/**
+ * @route GET /api/alert-types
+ * @desc Récupérer tous les types d'alerte
+ * @access Private
+ */
+router.get('/', async (req, res) => {
+  try {
+    const types = await prisma.alertType.findMany({
+      where: { isActive: true },
+      include: { 
+        services: {
+            select: {
+                id: true,
+                name: true,
+                type: true
+            }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(types);
+  } catch (error) {
+    console.error('Erreur récupération types alerte:', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+  }
+});
+
+/**
+ * @route POST /api/alert-types
+ * @desc Créer un nouveau type d'alerte
+ * @access Private (SuperAdmin)
+ */
+router.post('/', requireSuperAdmin, [
+  body('name').trim().notEmpty().withMessage('Le nom est requis'),
+  body('severity').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  body('serviceIds').optional().isArray()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { name, description, icon, severity, serviceIds, isActive = true } = req.body;
+    
+    // Check uniqueness
+    const existing = await prisma.alertType.findUnique({ where: { name } });
+    if (existing) {
+      return res.status(409).json({ error: 'Ce type existe déjà' });
+    }
+
+    const data = {
+      name, description, icon, severity, isActive
+    };
+
+    if (serviceIds && serviceIds.length > 0) {
+      data.services = {
+        connect: serviceIds.map(id => ({ id }))
+      };
+    }
+
+    const type = await prisma.alertType.create({
+      data,
+      include: { services: true }
+    });
+    res.status(201).json(type);
+  } catch (error) {
+    console.error('Erreur création type alerte:', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+  }
+});
+
+/**
+ * @route PUT /api/alert-types/:id
+ * @desc Modifier un type d'alerte
+ * @access Private (SuperAdmin)
+ */
+router.put('/:id', requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, description, icon, severity, serviceIds, isActive } = req.body;
+  
+  try {
+    const data = {};
+    if (name) data.name = name;
+    if (description !== undefined) data.description = description;
+    if (icon !== undefined) data.icon = icon;
+    if (severity) data.severity = severity;
+    if (isActive !== undefined) data.isActive = isActive;
+    
+    if (serviceIds && Array.isArray(serviceIds)) {
+      data.services = {
+        set: serviceIds.map(sid => ({ id: sid }))
+      };
+    }
+
+    const type = await prisma.alertType.update({
+      where: { id },
+      data,
+      include: { services: true }
+    });
+    res.json(type);
+  } catch (error) {
+    console.error('Erreur modification type alerte:', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+  }
+});
+
+/**
+ * @route DELETE /api/alert-types/:id
+ * @desc Supprimer un type d'alerte
+ * @access Private (SuperAdmin)
+ */
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Check if used in alerts
+    const usageCount = await prisma.alert.count({ where: { alertTypeId: id } });
+    if (usageCount > 0) {
+      return res.status(400).json({ error: 'Impossible de supprimer un type utilisé par des alertes existantes.' });
+    }
+
+    await prisma.alertType.delete({ where: { id } });
+    res.json({ message: 'Type supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur suppression type alerte:', error);
+    res.status(500).json({ error: 'Erreur serveur', details: error.message });
+  }
+});
+
+module.exports = router;
+
