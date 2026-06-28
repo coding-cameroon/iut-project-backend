@@ -52,6 +52,7 @@ const io = new Server(server, {
         "http://127.0.0.1:3005",
         "http://127.0.0.1:5175",
         "https://iut-project-frontend.vercel.app",
+        "https://iut-project-admin-dashboard.vercel.app",
       ];
 
       if (process.env.SOCKET_IO_CORS_ORIGIN) {
@@ -99,6 +100,7 @@ app.use(
         "http://127.0.0.1:3005",
         "http://127.0.0.1:5175",
         "https://iut-project-frontend.vercel.app",
+        "https://iut-project-admin-dashboard.vercel.app",
       ];
 
       if (process.env.CORS_ORIGIN) {
